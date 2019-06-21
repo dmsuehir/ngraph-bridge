@@ -48,9 +48,7 @@ def main():
         help="Stops the docker container\n",
         action="store_true")
     parser.add_argument(
-        '--run_in_docker',
-        help="run in docker\n",
-        action="store_true")
+        '--run_in_docker', help="run in docker\n", action="store_true")
     arguments = parser.parse_args()
 
     if arguments.build_base:
@@ -68,7 +66,8 @@ def main():
             os.chdir(arguments.output_dir)
 
             # Download TensorFlow
-            download_repo("tensorflow", "https://github.com/tensorflow/tensorflow.git",
+            download_repo("tensorflow",
+                          "https://github.com/tensorflow/tensorflow.git",
                           arguments.tf_version)
             os.chdir(pwd)
 
@@ -94,7 +93,8 @@ def main():
                      False)
     # idempotent
     if os.path.isdir('./artifacts/tensorflow/python'):
-        shutil.rmtree('./artifacts/tensorflow/python', ignore_errors=True, onerror=None)
+        shutil.rmtree(
+            './artifacts/tensorflow/python', ignore_errors=True, onerror=None)
 
     shutil.copytree('./tensorflow/tensorflow/python',
                     './artifacts/tensorflow/python')

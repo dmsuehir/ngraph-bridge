@@ -159,7 +159,7 @@ def setup_venv(venv_dir):
     # Install the pip packages
     cmdpart = ["pip", "install"]
     if os.getenv("IN_DOCKER") != None:
-        cmdpart.append("--cache-dir="+os.getcwd())
+        cmdpart.append("--cache-dir=" + os.getcwd())
     package_list = [
         "-U",
         "pip",
@@ -186,7 +186,7 @@ def setup_venv(venv_dir):
     # Print the current packages
     cmd = ["pip", "list"]
     if os.getenv("IN_DOCKER") != None:
-        cmd.append("--cache-dir="+os.getcwd())
+        cmd.append("--cache-dir=" + os.getcwd())
     command_executor(cmd)
 
 
@@ -395,7 +395,7 @@ def install_tensorflow(venv_dir, artifacts_dir):
 
     cmdpart = ["pip", "install"]
     if os.getenv("IN_DOCKER") != None:
-        cmdpart.append("--cache-dir="+pwd)
+        cmdpart.append("--cache-dir=" + pwd)
     cmd = cmdpart + ["-U", tf_wheel_files[0]]
     command_executor(cmd)
 
@@ -421,7 +421,7 @@ def build_ngraph_tf(build_dir, artifacts_location, ngtf_src_loc, venv_dir,
 
     cmdpart = ["pip"]
     if os.getenv("IN_DOCKER") != None:
-        cmdpart.append("--cache-dir="+pwd)
+        cmdpart.append("--cache-dir=" + pwd)
     cmd = cmdpart + ["list"]
     command_executor(cmd)
 
@@ -488,7 +488,7 @@ def install_ngraph_tf(venv_dir, ngtf_pip_whl):
 
     cmdpart = ["pip", "install"]
     if os.getenv("IN_DOCKER") != None:
-        cmdpart.append("--cache-dir="+os.getcwd())
+        cmdpart.append("--cache-dir=" + os.getcwd())
     cmd = cmdpart + ["-U", ngtf_pip_whl]
     command_executor(cmd)
 
@@ -542,52 +542,67 @@ def start_container(workingdir, cachedir):
     pwd = os.getcwd()
     u = os.getuid()
     g = os.getgid()
+    parentdir = os.path.dirname(cachedir)
     abscachedir = os.path.abspath(cachedir)
     if os.path.isdir(abscachedir) == False:
         os.makedirs(abscachedir)
-    start = ["docker", "run", "--name", "ngtf", "-u", str(u)+":"+str(g), "-v", pwd+":/ngtf", "-v", pwd+"/tf:/tf", "-v", pwd+"/"+cachedir+":/bazel/"+cachedir, "-w", workingdir, "-d", "-t", "ngtf"]
+    start = [
+        "docker", "run", "--name", "ngtf", "-u",
+        str(u) + ":" + str(g), "-v", pwd + ":/ngtf", "-v", pwd + "/tf:/tf",
+        "-v", pwd + "/" + parentdir + ":/bazel/" + parentdir, "-w", workingdir,
+        "-d", "-t", "ngtf"
+    ]
     try:
-        command_executor(start, stdout=open(os.devnull,"w"), stderr=open(os.devnull, "w"))
+        command_executor(
+            start, stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
     except Exception as exc:
         msg = str(exc)
-        print("caught exception: "+msg)
+        print("caught exception: " + msg)
 
 
 def check_container():
-     exitcode, out, err = get_exitcode_stdout_stderr("docker inspect -f '{{.State.Running}}' ngtf")
-     if exitcode == 0:
-         return True
-     return False
+    exitcode, out, err = get_exitcode_stdout_stderr(
+        "docker inspect -f '{{.State.Running}}' ngtf")
+    if exitcode == 0:
+        return True
+    return False
 
 
 def stop_container():
     try:
         stop = ["docker", "stop", "ngtf"]
-        command_executor(stop, stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
+        command_executor(
+            stop, stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
         rm = ["docker", "rm", "ngtf"]
-        command_executor(rm, stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
+        command_executor(
+            rm, stdout=open(os.devnull, "w"), stderr=open(os.devnull, "w"))
     except Exception as exc:
         msg = str(exc)
-        print("caught exception: "+msg)
+        print("caught exception: " + msg)
 
 
 def run_in_docker(buildcmd, cachedir, args):
     pwd = os.getcwd()
     u = os.getuid()
     g = os.getgid()
-    abscachedir = "/bazel/"+cachedir
-    cmd = ["docker", "exec", "-e" "IN_DOCKER=true", "-e", "USER="+os.getlogin(), "-e", "TEST_TMPDIR="+abscachedir, "-u", str(u)+":"+str(g), "-it", "ngtf"]
+    abscachedir = "/bazel/" + cachedir
+    cmd = [
+        "docker", "exec", "-e"
+        "IN_DOCKER=true", "-e", "USER=" + os.getlogin(), "-e",
+        "TEST_TMPDIR=" + abscachedir, "-u",
+        str(u) + ":" + str(g), "-it", "ngtf"
+    ]
     vargs = vars(args)
     for arg in vargs:
         if arg not in ["run_in_docker", "build_base", "stop_container"]:
             if arg == "use_tensorflow_from_location":
-                buildcmd += " --"+arg+"=/"+str(vargs[arg])
+                buildcmd += " --" + arg + "=/" + str(vargs[arg])
             elif vargs[arg] in [False, None]:
                 pass
             elif vargs[arg] == True:
                 buildcmd += " --" + arg
             else:
-                buildcmd += " --"+arg+"="+str(vargs[arg])
+                buildcmd += " --" + arg + "=" + str(vargs[arg])
     cmd.append(buildcmd)
     command_executor(cmd)
 
