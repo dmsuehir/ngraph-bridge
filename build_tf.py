@@ -44,6 +44,10 @@ def main():
         help="Builds a base container image\n",
         action="store_true")
     parser.add_argument(
+        '--start_container',
+        help="Starts the docker container\n",
+        action="store_true")
+    parser.add_argument(
         '--stop_container',
         help="Stops the docker container\n",
         action="store_true")
@@ -53,6 +57,10 @@ def main():
 
     if arguments.build_base:
         build_base(arguments)
+        return
+
+    if arguments.start_container:
+        start_container("/tf")
         return
 
     if arguments.stop_container:
@@ -74,8 +82,8 @@ def main():
     if arguments.run_in_docker:
         if check_container() == True:
             stop_container()
-        start_container("/tf", ".cache/tf")
-        run_in_docker("/ngtf/build_tf.py", ".cache/tf", arguments)
+        start_container("/tf")
+        run_in_docker("/ngtf/build_tf.py", arguments)
         return
 
     if os.getenv("IN_DOCKER") == None:
@@ -92,9 +100,9 @@ def main():
     build_tensorflow(venv_dir, "tensorflow", 'artifacts', arguments.target_arch,
                      False)
     # idempotent
-    if os.path.isdir('./artifacts/tensorflow/python'):
-        shutil.rmtree(
-            './artifacts/tensorflow/python', ignore_errors=True, onerror=None)
+    #if os.path.isdir('./artifacts/tensorflow/python'):
+    #    shutil.rmtree(
+    #       './artifacts/tensorflow/python', ignore_errors=True, onerror=None)
 
     shutil.copytree('./tensorflow/tensorflow/python',
                     './artifacts/tensorflow/python')
@@ -102,6 +110,8 @@ def main():
     output_dir = arguments.output_dir
     if os.getenv("IN_DOCKER") == None:
         output_dir = os.path.abspath(output_dir)
+    else:
+        output_dir += ' --run_in_docker'
 
     print('To build ngraph-bridge using this prebuilt tensorflow, use:')
     print('./build_ngtf.py --use_tensorflow_from_location ' + output_dir)
