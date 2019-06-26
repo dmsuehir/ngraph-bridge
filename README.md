@@ -136,7 +136,7 @@ Building in docker provides a consistent environment regardless of what OS you'r
 
         ./build_ngtf.py --build_base
 
-The `--build_base` option above will build a base container image. This base container image is used as the build environment. Subsequent commands shown below execute in this running container.
+The `--build_base` option above will build a base container image. This is a required first step prior to calling either build_ngtf.py or test_ngtf.py with the argument `--run_in_docker`. This base container image is used as the build environment. Subsequent commands shown below execute in this running container.
 
 	./build_ngtf.py --run_in_docker --tf_version v1.13.1 --ngraph_version v0.21.0
 
