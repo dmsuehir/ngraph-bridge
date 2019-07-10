@@ -84,7 +84,7 @@ ${DOCKER_HTTP_PROXY} ${DOCKER_HTTPS_PROXY} \
 --build-arg base_image=${BASE_IMAGE_NAME}:${BASE_IMAGE_TAG} \
 -f=${DIR_DOCKERFILES}/${NGTF_DOCKERFILE} -t=${NGTF_IMAGE_NAME}:${NGTF_IMAGE_TAG} ."
 
-echo "Docker build command for base image: ${dbuild_cmd}"
+echo "Docker build command for nGraph TF image: ${dbuild_cmd}"
 $dbuild_cmd
 dbuild_result=$?
 
