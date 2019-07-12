@@ -113,6 +113,11 @@ def apply_patch_and_test(test_folder, env_flags):
         stdout=PIPE,
         stderr=PIPE)
 
+    logfilename = "/logs/log_{}.txt".format(test_folder.split('/')[-1])
+    with open(logfilename, "w") as logfile:
+        logfile.write(so.decode())
+    print("Wrote log file to: {}".format(logfilename))
+
     command_executor('git reset --hard')  # remove applied patch (if any)
     return so.decode("utf-8"), se.decode("utf-8")
 
