@@ -86,7 +86,7 @@ def return_to_cwd(f):
 
 
 @return_to_cwd
-def apply_patch_and_test(test_folder, env_flags):
+def apply_patch_and_test(test_folder, env_flags, log_dir=None):
     model_dir = os.path.abspath(test_folder + '/..')
     downloaded_repo = os.path.abspath(model_dir + '/downloaded_model')
     command_executor('cd ' + model_dir)
@@ -107,19 +107,23 @@ def apply_patch_and_test(test_folder, env_flags):
         command_executor('git apply ' + patch_file)
 
     command_executor('chmod +x ' + test_folder + '/core_run.sh')
+
     so, se, errcode = command_executor(
         env_flags + ' ' + test_folder + '/core_run.sh',
         msg="Running test config " + test_folder.split('/')[-1] + ': ',
         stdout=PIPE,
         stderr=PIPE)
 
-    logfilename = "/logs/log_{}.txt".format(test_folder.split('/')[-1])
-    with open(logfilename, "w") as logfile:
-        logfile.write(so.decode())
-    print("Wrote log file to: {}".format(logfilename))
+    if log_dir:
+        logfilename = "{}/log_{}_{}.txt".format(log_dir, test_folder.split('/')[-2],
+                                                test_folder.split('/')[-1])
+        with open(logfilename, "w", encoding='utf-8') as logfile:
+            logfile.write(so.decode('utf-8', errors='ignore'))
+        print("Wrote log file to: {}".format(logfilename))
 
     command_executor('git reset --hard')  # remove applied patch (if any)
-    return so.decode("utf-8"), se.decode("utf-8")
+
+    return so.decode(), se.decode()  # so.decode("utf-8"), se.decode("utf-8")
 
 
 @return_to_cwd
@@ -135,7 +139,7 @@ def ready_repo(model_dir, repo_dl_loc):
 # TODO: this function needs to accept "do-i-dump-pbtxt"? and if so, a cleanup needs to happen later.
 # Also this function could return the list of pbtxts it generated (but does it need to? we can infer it)
 # TODO: this function should also take the level/intensity of test to run
-def run_test_suite(model_dir, configuration, disabled, print_parsed):
+def run_test_suite(model_dir, configuration, disabled, print_parsed, log_dir=None):
     try:
         # TODO: assert TF version. Some models may not run on TF1.12 etc
         model_dir = os.path.abspath(model_dir)
@@ -183,7 +187,7 @@ def run_test_suite(model_dir, configuration, disabled, print_parsed):
                         try:
                             so, se = apply_patch_and_test(
                                 sub_test_dir, ('NGRAPH_TF_LOG_PLACEMENT=1',
-                                               '')[custom_parser_present])
+                                               '')[custom_parser_present], log_dir)
                         except Exception as e:
                             print(e)
                             failed_tests.append(flname)
@@ -211,7 +215,7 @@ def run_test_suite(model_dir, configuration, disabled, print_parsed):
                         # TODO: run Level1 tests on gdef. needs another json for that (one which specifies input shapes etc)
 
                     expected_json_file = sub_test_dir + '/expected.json'
-                    expected_json_present = os.path.isfile(expected_json_file)
+                    expected_json_present = False # os.path.isfile(expected_json_file)
                     if print_parsed or expected_json_present:
                         # parse logs in this case
                         if custom_parser_present:
@@ -236,6 +240,17 @@ def run_test_suite(model_dir, configuration, disabled, print_parsed):
                                     sort_keys=True,
                                     indent=4,
                                     separators=(',', ': ')))
+                            if log_dir:
+                                test_group = sub_test_dir.split('/')[-2]
+                                parsedlogname = "{}/parsed_log_{}_{}.txt".format(
+                                    log_dir, test_group, flname)
+                                with open(parsedlogname, "w") as logfile:
+                                    logfile.write(json.dumps(
+                                        replaced_single_with_double_quotes,
+                                        sort_keys=True,
+                                        indent=4,
+                                        separators=(',', ': ')))
+                                print("Wrote parsed log file to: {}".format(parsedlogname))
                     # If expected.json is present, run some extra tests. If not present we deem the test passed if it ran apply_patch_and_test without raising any errors
                     if expected_json_present:
                         try:
@@ -404,6 +419,13 @@ if __name__ == '__main__':
         help=
         'Print the parsed values from log parsing. Useful when checking in a new model and we want to know its expected values'
     )
+    parser.add_argument(
+        '--log_dir',
+        action='store',
+        type=str,
+        help='If provided, log files will be written to the directory.',
+        default=''
+    )
 
     # This script must be run from this location
     assert cwd.split('/')[-1] == 'model_level_tests'
@@ -444,7 +466,7 @@ if __name__ == '__main__':
             if args.run_basic_tests:
                 passed_tests_in_suite, failed_tests_in_suite, skipped_tests_in_suite = run_test_suite(
                     './models/' + test_suite, args.configuration,
-                    disabled_sub_test.get(test_suite, []), args.print_parsed)
+                    disabled_sub_test.get(test_suite, []), args.print_parsed, args.log_dir)
                 passed_tests[test_suite] = passed_tests_in_suite
                 failed_tests[test_suite] = failed_tests_in_suite
                 skipped_tests[test_suite] = skipped_tests_in_suite

@@ -14,6 +14,7 @@
 #  limitations under the License.
 # =============================================================================
 
+import re
 
 def parse_logs(log_lines):
     if type(log_lines) == type(''):
@@ -29,6 +30,7 @@ def parse_logs(log_lines):
     all_results = {}
     curr_result = {}
     ctr = 0
+    prev_line = ""
     for line in log_lines:
         start_of_subgraph = "NGTF_SUMMARY: Op_not_supported:" in line
         # If logs of a new sub-graph is starting, save the old one
@@ -45,10 +47,49 @@ def parse_logs(log_lines):
             elif 'Number of nodes marked for clustering' in line:
                 curr_result['num_nodes_marked_for_clustering'] = int(
                     line.split(':')[-1].strip().split(' ')[0].strip())
+
+                # get percentage of total nodes
+                match = re.search("(\d+(\.\d+)?%)", line)
+                nodes_clustered = ""
+                if match:
+                    nodes_clustered = match.group(0)
+                curr_result["percentage_nodes_clustered"] = nodes_clustered
             elif 'Number of ngraph clusters' in line:
                 curr_result['num_ng_clusters'] = int(
                     line.split(':')[-1].strip())
-            # TODO: fill other information as needed
+            elif 'DEADNESS' in line and 'STATICINPUT' in line:
+                line = line[len("NGTF_SUMMARY:"):]
+                reasons = dict([i.strip() for i in item.split(":")] for item in line.split(","))
+                if "reasons why a pair of edge connected encapsulates did not merge" in prev_line:
+                    curr_result['why_edge_connected_encapsulates_did_not_merge'] = reasons
+                elif "reasons why a pair of edge connected clusters did not merge" in prev_line:
+                    curr_result['why_edge_connected_clusters_did_not_merge'] = reasons
+
+                # default has_deadness_issues and has_static_input_issues to 'No'
+                if 'has_deadness_issues' not in curr_result.keys():
+                    curr_result['has_deadness_issues'] = "No"
+                if 'has_static_input_issues' not in curr_result.keys():
+                    curr_result['has_static_input_issues'] = "No"
+
+                # set has deadness/static input issues to 'Yes' if the value is > 0
+                if int(reasons['DEADNESS']) > 0:
+                    curr_result['has_deadness_issues'] = "Yes"
+                if int(reasons['STATICINPUT']) > 0:
+                    curr_result['has_static_input_issues'] = "Yes"
+            elif 'Nodes per cluster' in line:
+                curr_result['nodes_per_cluster'] = float(line.split(':')[-1].strip())
+            elif 'Types of edges::' in line:
+                line = line[len("NGTF_SUMMARY: Types of edges:: "):]
+                edge_types = dict([i.strip() for i in item.split(":")] for item in line.split(","))
+                curr_result["types_of_edges"] = edge_types
+            elif 'Op_not_supported' in line:
+                curr_result["op_not_supported"] = \
+                    [i.strip() for i in line[len("NGTF_SUMMARY: Op_not_supported:  "):].split(",")]
+            elif 'Op_failed_type_constraint':
+                curr_result["op_failed_type_constraint"] = \
+                    [i.strip() for i in line[len(
+                        "NGTF_SUMMARY: Op_failed_type_constraint:  "):].split(",")]
+        prev_line = line
     return all_results
 
 
