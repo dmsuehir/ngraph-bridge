@@ -90,6 +90,10 @@ def parse_logs(log_lines):
                     [i.strip() for i in line[len(
                         "NGTF_SUMMARY: Op_failed_type_constraint:  "):].split(",")]
         prev_line = line
+
+    # add the last section to the results
+    all_results[str(ctr)] = curr_result
+
     return all_results
 
 
