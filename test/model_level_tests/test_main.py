@@ -104,7 +104,7 @@ def apply_patch_and_test(test_folder, env_flags, log_dir=None):
 
     command_executor('cd ' + downloaded_repo)
     if patch_file is not None:
-        command_executor('git apply ' + patch_file)
+        command_executor('git apply --whitespace=fix ' + patch_file)
 
     command_executor('chmod +x ' + test_folder + '/core_run.sh')
 
@@ -123,7 +123,7 @@ def apply_patch_and_test(test_folder, env_flags, log_dir=None):
 
     command_executor('git reset --hard')  # remove applied patch (if any)
 
-    return so.decode(), se.decode()  # so.decode("utf-8"), se.decode("utf-8")
+    return so.decode("utf-8"), se.decode("utf-8")
 
 
 @return_to_cwd
