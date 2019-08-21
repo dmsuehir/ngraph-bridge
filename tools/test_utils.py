@@ -124,7 +124,9 @@ def run_ngtf_pytests(venv_dir, build_dir):
     command_executor(["pip", "install", "-U", "pytest"])
     command_executor(["pip", "install", "-U", "psutil"])
 
-    cmd = 'python -m pytest ' + ('--junitxml=%s/xunit_pytest.xml' % build_dir)
+    cmd = 'python -m pytest ' + (
+        '--junitxml=%s/xunit_pytest.xml' %
+        build_dir) + " --ignore=" + build_dir + "/test/python/bfloat16"
     env = os.environ.copy()
     new_paths = venv_dir + '/bin/python3:' + os.path.abspath(
         build_dir) + ":" + os.path.abspath(mnist_dir)
@@ -159,7 +161,8 @@ def run_ngtf_pytests_from_artifacts(artifacts_dir):
     command_executor(["pip", "install", "-U", "psutil"])
     command_executor([
         "python", "-m", "pytest",
-        ('--junitxml=%s/xunit_pytest.xml' % artifacts_dir)
+        ('--junitxml=%s/xunit_pytest.xml' % artifacts_dir),
+        "--ignore=" + artifacts_dir + "/test/python/bfloat16"
     ])
 
     os.chdir(root_pwd)
@@ -193,7 +196,11 @@ def run_tensorflow_pytests(venv_dir, build_dir, ngraph_tf_src_dir, tf_src_dir):
     # Now run the TensorFlow python tests
     test_src_dir = os.path.join(ngraph_tf_src_dir, "test/python/tensorflow")
     test_script = os.path.join(test_src_dir, "tf_unittest_runner.py")
-    test_manifest_file = os.path.join(test_src_dir, "python_tests_list.txt")
+    if get_os_type() == 'Darwin':
+        test_manifest_file = os.path.join(test_src_dir,
+                                          "python_tests_list_mac.txt")
+    else:
+        test_manifest_file = os.path.join(test_src_dir, "python_tests_list.txt")
     test_xml_report = '%s/junit_tensorflow_tests.xml' % build_dir
 
     import psutil
@@ -251,7 +258,12 @@ def run_tensorflow_pytests_from_artifacts(backend, ngraph_tf_src_dir,
         test_manifest_file = os.path.join(test_src_dir,
                                           "python_tests_list_gpu.txt")
     else:
-        test_manifest_file = os.path.join(test_src_dir, "python_tests_list.txt")
+        if get_os_type() == 'Darwin':
+            test_manifest_file = os.path.join(test_src_dir,
+                                              "python_tests_list_mac.txt")
+        else:
+            test_manifest_file = os.path.join(test_src_dir,
+                                              "python_tests_list.txt")
     test_xml_report = './junit_tensorflow_tests.xml'
 
     import psutil
@@ -285,6 +297,7 @@ def run_resnet50(build_dir):
     junit_script = os.path.abspath('%s/test/ci/junit-wrap.sh' % root_pwd)
 
     # Check to see if we need to patch the repo for Grappler
+    # benchmark_cnn.patch will only work for the CPU backend
     patch_file = os.path.abspath(
         os.path.join(ngraph_tf_src_dir, "test/grappler/benchmark_cnn.patch"))
     import ngraph_bridge
@@ -350,6 +363,7 @@ def run_resnet50_from_artifacts(ngraph_tf_src_dir, artifact_dir, batch_size,
     call(['git', 'checkout', '4c7b09ad87bbfc4b1f89650bcee40b3fc5e7dfed'])
 
     # Check to see if we need to patch the repo for Grappler
+    # benchmark_cnn.patch will only work for the CPU backend
     patch_file = os.path.abspath(
         os.path.join(ngraph_tf_src_dir, "test/grappler/benchmark_cnn.patch"))
     import ngraph_bridge
@@ -423,6 +437,111 @@ def run_resnet50_from_artifacts(ngraph_tf_src_dir, artifact_dir, batch_size,
     os.chdir(root_pwd)
 
 
+def run_resnet50_forward_pass(build_dir):
+
+    root_pwd = os.getcwd()
+    build_dir = os.path.abspath(build_dir)
+    ngraph_tf_src_dir = os.path.abspath(build_dir + '/../')
+    os.chdir(build_dir)
+
+    call(['git', 'clone', 'https://github.com/tensorflow/benchmarks.git'])
+    os.chdir('benchmarks')
+    call(['git', 'checkout', '4c7b09ad87bbfc4b1f89650bcee40b3fc5e7dfed'])
+
+    junit_script = os.path.abspath('%s/test/ci/junit-wrap.sh' % root_pwd)
+
+    # Check to see if we need to patch the repo for Grappler
+    # benchmark_cnn.patch will only work for the CPU backend
+    patch_file = os.path.abspath(
+        os.path.join(ngraph_tf_src_dir, "test/grappler/benchmark_cnn.patch"))
+    import ngraph_bridge
+    if ngraph_bridge.is_grappler_enabled():
+        print("Patching repo using: %s" % patch_file)
+        apply_patch(patch_file)
+
+    os.chdir('scripts/tf_cnn_benchmarks/')
+    # Update the script by adding `import ngraph_bridge`
+    with open('convnet_builder.py', 'a') as outfile:
+        call(['echo', 'import ngraph_bridge'], stdout=outfile)
+
+    # Setup the env flags
+    import psutil
+    num_cores = int(psutil.cpu_count(logical=False))
+    print("OMP_NUM_THREADS: %s " % str(num_cores))
+
+    os.environ['OMP_NUM_THREADS'] = str(num_cores)
+    os.environ["KMP_AFFINITY"] = 'granularity=fine,compact,1,0'
+
+    os.environ['JUNIT_WRAP_FILE'] = "%s/junit_inference_test.xml" % build_dir
+    os.environ['JUNIT_WRAP_SUITE'] = 'models'
+    os.environ['JUNIT_WRAP_TEST'] = 'resnet50-inference'
+
+    # Run inference job
+    cmd = [
+        junit_script, 'python', 'tf_cnn_benchmarks.py', '--data_format', 'NCHW',
+        '--num_inter_threads', '2', '--freeze_when_forward_only=True',
+        '--model=resnet50', '--batch_size=1', '--num_batches', '32'
+    ]
+    command_executor(cmd, verbose=True)
+    os.chdir(root_pwd)
+
+
+def run_resnet50_forward_pass_from_artifacts(ngraph_tf_src_dir, artifact_dir,
+                                             batch_size, iterations):
+
+    root_pwd = os.getcwd()
+    artifact_dir = os.path.abspath(artifact_dir)
+    ngraph_tf_src_dir = os.path.abspath(ngraph_tf_src_dir)
+    install_ngraph_bridge(artifact_dir)
+
+    # Now clone the repo and proceed
+    call(['git', 'clone', 'https://github.com/tensorflow/benchmarks.git'])
+    os.chdir('benchmarks')
+    call(['git', 'checkout', '4c7b09ad87bbfc4b1f89650bcee40b3fc5e7dfed'])
+
+    # Check to see if we need to patch the repo for Grappler
+    # benchmark_cnn.patch will only work for the CPU backend
+    patch_file = os.path.abspath(
+        os.path.join(ngraph_tf_src_dir, "test/grappler/benchmark_cnn.patch"))
+    import ngraph_bridge
+    if ngraph_bridge.is_grappler_enabled():
+        print("Patching repo using: %s" % patch_file)
+        apply_patch(patch_file)
+
+    os.chdir('scripts/tf_cnn_benchmarks/')
+
+    # junit_script = os.path.abspath('%s/test/ci/junit-wrap.sh' % root_pwd)
+
+    # Update the script by adding `import ngraph_bridge`
+    with open('convnet_builder.py', 'a') as outfile:
+        call(['echo', 'import ngraph_bridge'], stdout=outfile)
+
+    # Setup the env flags
+    import psutil
+    num_cores = int(psutil.cpu_count(logical=False))
+    print("OMP_NUM_THREADS: %s " % str(num_cores))
+
+    os.environ['OMP_NUM_THREADS'] = str(num_cores)
+    os.environ["KMP_AFFINITY"] = 'granularity=fine,compact,1,0'
+
+    cmd = [
+        'python',
+        'tf_cnn_benchmarks.py',
+        '--data_format',
+        'NCHW',
+        '--num_inter_threads',
+        '2',
+        '--freeze_when_forward_only=True',
+        '--model=resnet50',
+        '--batch_size=' + str(batch_size),
+        '--num_batches',
+        str(iterations),
+    ]
+    command_executor(cmd, verbose=True)
+
+    os.chdir(root_pwd)
+
+
 def run_cpp_example_test(build_dir):
 
     root_pwd = os.getcwd()
@@ -476,8 +595,9 @@ def run_bazel_build_test(venv_dir, build_dir):
     # Build the bridge
     command_executor(['bazel', 'build', 'libngraph_bridge.so'])
 
-    # Build the backend
+    # Build the backends
     command_executor(['bazel', 'build', '@ngraph//:libinterpreter_backend.so'])
+    command_executor(['bazel', 'build', '@ngraph//:libcpu_backend.so'])
 
     # Return to the original directory
     os.chdir(root_pwd)
@@ -495,6 +615,7 @@ def run_bazel_build():
 
     # Build the backend
     command_executor(['bazel', 'build', '@ngraph//:libinterpreter_backend.so'])
+    command_executor(['bazel', 'build', '@ngraph//:libcpu_backend.so'])
 
     # Return to the original directory
     os.chdir(root_pwd)
