@@ -21,4 +21,4 @@ if __name__ == '__main__':
     path = trainer.train(generator, './unet_trained', training_iters=TRAIN_ITER, epochs=TRAIN_EPOCH, display_step=1)
     print('Done training unet')" > train_unet.py
 
-git add train_unet.py
+echo "Ready repo complete"
