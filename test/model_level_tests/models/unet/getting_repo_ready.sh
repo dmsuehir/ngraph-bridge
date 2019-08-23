@@ -21,4 +21,4 @@ if __name__ == '__main__':
     print('Done training unet')" > train_unet.py
 
 git add train_unet.py
-git commit -m "Adding train script"
+git commit -m "Adding train script" --author "script <>"
