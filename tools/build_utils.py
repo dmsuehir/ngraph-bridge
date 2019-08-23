@@ -475,24 +475,19 @@ def install_ngraph_tf(venv_dir, ngtf_pip_whl):
 def download_repo(target_name, repo, version):
 
     # First download to a temp folder
-    print("Clone repo: {}".format(repo))
     call(["git", "clone", repo, target_name])
 
     # Next goto this folder nd determine the name of the root folder
     pwd = os.getcwd()
 
     # Go to the tree
-    print("Go to directory: {}".format(target_name))
     os.chdir(target_name)
 
     # checkout the specified branch
-    print("git fetch")
     call(["git", "fetch"])
-    print("git checkout {}".format(version))
     command_executor(["git", "checkout", version])
 
     # Get the latest if applicable
-    print("git pull")
     call(["git", "pull"])
     os.chdir(pwd)
 
