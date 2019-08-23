@@ -3,11 +3,12 @@ new file mode 100644
 index 0000000..f49a55f
 --- /dev/null
 +++ b/train_unet.py
-@@ -0,0 +1,15 @@
+@@ -0,0 +1,16 @@
 +from tf_unet import image_gen
 +from tf_unet import unet
 +from tf_unet import util
 +import tensorflow as tf
++import ngraph_bridge
 +TRAIN_ITER = 5
 +TRAIN_EPOCH = 1
 +BS = 16
