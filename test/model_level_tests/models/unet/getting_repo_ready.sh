@@ -8,7 +8,6 @@ echo "from tf_unet import image_gen
 from tf_unet import unet
 from tf_unet import util
 import tensorflow as tf
-import ngraph_bridge
 TRAIN_ITER = 5
 TRAIN_EPOCH = 1
 BS = 16
@@ -21,4 +20,5 @@ if __name__ == '__main__':
     path = trainer.train(generator, './unet_trained', training_iters=TRAIN_ITER, epochs=TRAIN_EPOCH, display_step=1)
     print('Done training unet')" > train_unet.py
 
-echo "Ready repo complete"
+git add train_unet.py
+git commit -m "Adding train script"
